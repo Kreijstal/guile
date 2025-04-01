@@ -1064,20 +1064,16 @@ VM_NAME (scm_thread *thread)
         {
           scm_jit_enter_mcode (thread, mcode);
         }
-      else
-#else
+      else // JIT enabled, but mcode is NULL or disabled
+        {
+          CACHE_REGISTER ();
+          NEXT (0);
+        }
+#else // JIT disabled
       CALL_INTRINSIC (compose_continuation, (thread, vmcont));
+      CACHE_REGISTER ();
+      NEXT (0);
 #endif
-        {
-          CACHE_REGISTER ();
-          NEXT (0);
-        }
-      else
-#endif
-        {
-          CACHE_REGISTER ();
-          NEXT (0);
-        }
     }
 
   /* capture-continuation dst:24
