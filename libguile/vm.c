@@ -1602,7 +1602,9 @@ scm_call_n (SCM proc, SCM *argv, size_t nargs)
 
     if (SCM_UNLIKELY (resume))
       {
+#if ENABLE_JIT
         uint8_t *mcode = vp->mra_after_abort;
+#endif
         scm_gc_after_nonlocal_exit ();
         /* Non-local return.  */
         if (vp->abort_hook_enabled)

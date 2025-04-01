@@ -530,7 +530,9 @@ VM_NAME (scm_thread *thread)
   VM_DEFINE_OP (7, return_values, "return-values", OP1 (X32))
     {
       union scm_vm_stack_element *old_fp;
+#if ENABLE_JIT
       uint8_t *mcode;
+#endif
 
       RETURN_HOOK ();
 
@@ -1048,18 +1050,25 @@ VM_NAME (scm_thread *thread)
     {
       SCM vmcont;
       uint32_t cont_idx;
+#if ENABLE_JIT
       uint8_t *mcode;
+#endif
 
       UNPACK_24 (op, cont_idx);
       vmcont = SCM_PROGRAM_FREE_VARIABLE_REF (FP_REF (0), cont_idx);
 
       SYNC_IP ();
-      mcode = CALL_INTRINSIC (compose_continuation, (thread, vmcont));
-
 #if ENABLE_JIT
+      mcode = CALL_INTRINSIC (compose_continuation, (thread, vmcont));
       if (mcode && !VP->disable_mcode)
         {
           scm_jit_enter_mcode (thread, mcode);
+        }
+      else
+#else
+      CALL_INTRINSIC (compose_continuation, (thread, vmcont));
+#endif
+        {
           CACHE_REGISTER ();
           NEXT (0);
         }
@@ -3478,8 +3487,32 @@ VM_NAME (scm_thread *thread)
       NEXT (4);
     }
 
-  VM_DEFINE_OP (167, unused_167, NULL, NOP)
-  VM_DEFINE_OP (168, unused_168, NULL, NOP)
+  /* ulogand/immediate dst:8 src:8 imm:8
+   *
+   * Place the bitwise AND of the u64 value in SRC and the immediate IMM
+   * into DST.
+   */
+  VM_DEFINE_OP (167, ulogand_immediate, "ulogand/immediate", DOP1 (X8_S8_S8_C8))
+    {
+      uint8_t dst, src, imm;
+      uint64_t x;
+
+      UNPACK_8_8_8 (op, dst, src, imm);
+      x = SP_REF_U64 (src);
+      SP_SET_U64 (dst, x & (uint64_t) imm);
+      NEXT (1);
+    }
+
+  /* unreachable _:24
+   *
+   * This instruction should never be reached.
+   */
+  VM_DEFINE_OP (168, unreachable, "unreachable", OP1 (X32))
+    {
+      vm_error_bad_instruction (op);
+      abort (); /* never reached */
+    }
+
   VM_DEFINE_OP (169, unused_169, NULL, NOP)
   VM_DEFINE_OP (170, unused_170, NULL, NOP)
   VM_DEFINE_OP (171, unused_171, NULL, NOP)
